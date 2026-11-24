@@ -1,0 +1,49 @@
+name: Build APK from discordapk.zip v4
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unzip discordapk.zip
+        run: |
+          mkdir -p project_src
+          unzip -q discordapk.zip -d project_src
+          touch project_src/.env.example project_src/.env
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Debug APK
+        run: |
+          GRADLE_FILE=$(find project_src -maxdepth 3 -name "build.gradle.kts" -o -name "build.gradle" | head -n 1)
+          PROJECT_DIR=$(dirname "$GRADLE_FILE")
+          touch "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
+          [ -d "$PROJECT_DIR/app" ] && touch "$PROJECT_DIR/app/.env.example" "$PROJECT_DIR/app/.env"
+          cd "$PROJECT_DIR"
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug --no-daemon
+          else
+            gradle assembleDebug --no-daemon
+          fi
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: "**/app/build/outputs/apk/debug/*.apk"
+          
